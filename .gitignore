@@ -1,1 +1,73 @@
-src/ga.py
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# PyCharm / VSCode / IDEs
+.idea/
+.vscode/
+*.code-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+*.log
+
+# Test cache and coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Wheel and distribution
+*.whl
+
+# Multiprocessing or temporary cache
+multiprocessing.log
+*.pid
+
+# User-generated data or exports
+*.csv
+*.json
+*.dat
+*.db
+*.sqlite3
+*.pkl
+*.npy
+
+# Level output / metrics
+levels/
+results/
+output/
+exports/
+
+# VSCode Python lint/mypy cache
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Global ignore
+*.swp
+*.bak
+*~
