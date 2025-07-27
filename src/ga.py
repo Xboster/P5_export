@@ -64,15 +64,18 @@ class Individual_Grid(object):
 
     # Mutate a genome into a new genome.  Note that this is a _genome_, not an individual!
     def mutate(self, genome):
-        # STUDENT implement a mutation operator, also consider not mutating this individual
-        # STUDENT also consider weighting the different tile types so it's not uniformly random
-        # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
+        mutation_rate = 0.02  # 2% chance per tile
         left = 1
         right = width - 1
+
         for y in range(height):
             for x in range(left, right):
-                pass
+                tile = genome[y][x]
+                if tile in {"m", "v", "f"}:
+                    continue  # Don't mutate special tiles
+                if random.random() < mutation_rate:
+                    # Mutate this tile
+                    genome[y][x] = random.choice(options)
         return genome
 
     # Create zero or more children from self and other
@@ -342,12 +345,60 @@ class Individual_DE(object):
 
 Individual = Individual_Grid
 
-
 def generate_successors(population):
     results = []
-    # STUDENT Design and implement this
-    # Hint: Call generate_children() on some individuals and fill up results.
+    pop_size = len(population)
+    elite_count = 1  # Number of top individuals to preserve
+
+    # --- Precompute fitnesses ---
+    fitnesses = [ind.fitness() for ind in population]
+
+    # --- Sort population by fitness for elitism ---
+    sorted_population = sorted(population, key=lambda ind: ind.fitness(), reverse=True)
+    elites = sorted_population[:elite_count]
+
+    # --- Roulette setup ---
+    min_fitness = min(fitnesses)
+    if min_fitness < 0:
+        fitnesses = [f - min_fitness for f in fitnesses]
+    total_fitness = sum(fitnesses)
+    if total_fitness == 0:
+        probabilities = [1 / pop_size] * pop_size
+    else:
+        probabilities = [f / total_fitness for f in fitnesses]
+    cumulative_probs = []
+    cumulative = 0
+    for p in probabilities:
+        cumulative += p
+        cumulative_probs.append(cumulative)
+
+    def roulette_select():
+        r = random.random()
+        for i, cp in enumerate(cumulative_probs):
+            if r <= cp:
+                return population[i]
+        return population[-1]
+
+    def tournament_select(k=3):
+        contenders = random.sample(population, k)
+        return max(contenders, key=lambda ind: ind.fitness())
+
+    # Generate children to fill the rest of the population
+    while len(results) < (pop_size - elite_count):
+        parent1 = roulette_select() if random.random() < 0.5 else tournament_select()
+        parent2 = roulette_select() if random.random() < 0.5 else tournament_select()
+        while parent1 is parent2:
+            parent2 = roulette_select() if random.random() < 0.5 else tournament_select()
+
+        children = parent1.generate_children(parent2)
+        results.extend(children)
+
+    # Add elites to the population
+    results = results[:pop_size - elite_count]  # Trim if overfilled
+    results.extend(copy.deepcopy(elites))       # Deepcopy to avoid modifying originals
+
     return results
+
 
 
 def ga():
