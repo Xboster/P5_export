@@ -87,11 +87,14 @@ class Individual_Grid(object):
         right = width - 1
         for y in range(height):
             for x in range(left, right):
-                # STUDENT Which one should you take?  Self, or other?  Why?
-                # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                pass
-        # do mutation; note we're returning a one-element tuple here
-        return (Individual_Grid(new_genome),)
+                # Uniform crossover: 50% chance to take tile from other parent
+                if random.random() < 0.5:
+                    new_genome[y][x] = other.genome[y][x]
+
+        # Mutate and return a new Individual_Grid
+        mutated_genome = self.mutate(new_genome)
+        return (Individual_Grid(mutated_genome),)
+
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
