@@ -160,24 +160,47 @@ class Individual_DE(object):
     # Calculate and cache fitness
     def calculate_fitness(self):
         measurements = metrics.metrics(self.to_level())
-        # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
-        # STUDENT Add more metrics?
-        # STUDENT Improve this with any code you like
+
         coefficients = dict(
-            meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
-            pathPercentage=0.5,
-            emptyPercentage=0.6,
-            linearity=-0.5,
-            solvability=2.0
+            meaningfulJumpVariance=0.8,  # encourages jumps
+            negativeSpace=0.4,           # balance emptiness
+            pathPercentage=0.6,          # should be playable
+            emptyPercentage=0.3,         # penalize excessive emptiness
+            linearity=-0.4,              # less linear = more interesting
+            solvability=3.0              # solvability is crucial
         )
+
         penalties = 0
-        # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
-        if len(list(filter(lambda de: de[1] == "6_stairs", self.genome))) > 5:
-            penalties -= 2
-        # STUDENT If you go for the FI-2POP extra credit, you can put constraint calculation in here too and cache it in a new entry in __slots__.
-        self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
-                                coefficients)) + penalties
+
+        # Penalty: Too many stairs
+        stairs_count = len([de for de in self.genome if de[1] == "6_stairs"])
+        if stairs_count > 4:
+            penalties -= (stairs_count - 4) * 0.5
+
+        # Penalty: Unplayable design (e.g., pipes without tops)
+        pipe_tops = len([de for de in self.genome if de[1] == "7_pipe"])
+        if pipe_tops == 0:
+            penalties -= 1.0
+
+        # Bonus: Has at least 1 platform
+        platforms = len([de for de in self.genome if de[1] == "1_platform"])
+        if platforms > 0:
+            penalties += 0.5
+
+        # Bonus: Variety of DEs
+        unique_types = len(set(de[1] for de in self.genome))
+        penalties += 0.05 * unique_types
+
+        # Penalty: Wide holes
+        wide_holes = [de for de in self.genome if de[1] == "0_hole" and de[2] > 3]
+        penalties -= len(wide_holes) * 0.5
+
+        # Penalty: Tall pipes
+        tall_pipes = [de for de in self.genome if de[1] == "7_pipe" and de[2] > 3]
+        penalties -= len(tall_pipes) * 0.3
+
+
+        self._fitness = sum(coefficients[m] * measurements[m] for m in coefficients) + penalties
         return self
 
     def fitness(self):
@@ -186,84 +209,49 @@ class Individual_DE(object):
         return self._fitness
 
     def mutate(self, new_genome):
-        # STUDENT How does this work?  Explain it in your writeup.
-        # STUDENT consider putting more constraints on this, to prevent generating weird things
-        if random.random() < 0.1 and len(new_genome) > 0:
-            to_change = random.randint(0, len(new_genome) - 1)
-            de = new_genome[to_change]
+        mutation_rate = 0.2
+
+        # Mutation: Modify an element
+        if random.random() < mutation_rate and len(new_genome) > 0:
+            idx = random.randint(0, len(new_genome) - 1)
+            de = new_genome[idx]
             new_de = de
             x = de[0]
             de_type = de[1]
             choice = random.random()
+
             if de_type == "4_block":
                 y = de[2]
                 breakable = de[3]
-                if choice < 0.33:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.66:
-                    y = offset_by_upto(y, height / 2, min=0, max=height - 1)
-                else:
-                    breakable = not de[3]
-                new_de = (x, de_type, y, breakable)
-            elif de_type == "5_qblock":
-                y = de[2]
-                has_powerup = de[3]  # boolean
-                if choice < 0.33:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.66:
-                    y = offset_by_upto(y, height / 2, min=0, max=height - 1)
-                else:
-                    has_powerup = not de[3]
-                new_de = (x, de_type, y, has_powerup)
+                new_de = (
+                    offset_by_upto(x, width // 6, 1, width - 2) if choice < 0.33 else x,
+                    de_type,
+                    offset_by_upto(y, 4, 1, height - 1) if 0.33 <= choice < 0.66 else y,
+                    not breakable if choice >= 0.66 else breakable
+                )
+            elif de_type == "2_enemy":
+                # Enemies only go on the ground (height - 2)
+                new_de = (offset_by_upto(x, 5, 1, width - 2), de_type)
             elif de_type == "3_coin":
                 y = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                else:
-                    y = offset_by_upto(y, height / 2, min=0, max=height - 1)
-                new_de = (x, de_type, y)
-            elif de_type == "7_pipe":
-                h = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                else:
-                    h = offset_by_upto(h, 2, min=2, max=height - 4)
-                new_de = (x, de_type, h)
-            elif de_type == "0_hole":
-                w = de[2]
-                if choice < 0.5:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                else:
-                    w = offset_by_upto(w, 4, min=1, max=width - 2)
-                new_de = (x, de_type, w)
-            elif de_type == "6_stairs":
-                h = de[2]
-                dx = de[3]  # -1 or 1
-                if choice < 0.33:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.66:
-                    h = offset_by_upto(h, 8, min=1, max=height - 4)
-                else:
-                    dx = -dx
-                new_de = (x, de_type, h, dx)
-            elif de_type == "1_platform":
-                w = de[2]
-                y = de[3]
-                madeof = de[4]  # from "?", "X", "B"
-                if choice < 0.25:
-                    x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.5:
-                    w = offset_by_upto(w, 8, min=1, max=width - 2)
-                elif choice < 0.75:
-                    y = offset_by_upto(y, height, min=0, max=height - 1)
-                else:
-                    madeof = random.choice(["?", "X", "B"])
-                new_de = (x, de_type, w, y, madeof)
-            elif de_type == "2_enemy":
+                new_de = (offset_by_upto(x, 5, 1, width - 2), de_type, offset_by_upto(y, 2, 1, height - 2))
+            else:
+                # Do nothing fancy for other types
                 pass
-            new_genome.pop(to_change)
-            heapq.heappush(new_genome, new_de)
+
+            new_genome[idx] = new_de
+
+        # Mutation: Add an element (small chance)
+        if random.random() < 0.05:
+            new_genome.append(Individual_DE.random_individual().genome[0])
+
+        # Mutation: Remove an element (small chance)
+        if random.random() < 0.05 and len(new_genome) > 1:
+            del new_genome[random.randint(0, len(new_genome) - 1)]
+
+        heapq.heapify(new_genome)
         return new_genome
+
 
     def generate_children(self, other):
         # STUDENT How does this work?  Explain it in your writeup.
